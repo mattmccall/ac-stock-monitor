@@ -321,6 +321,12 @@ def test_core_filter_word_boundary_keeps_attente():
         "Climatiseur mobile sans attente 9000 BTU") is True
 
 
+def test_core_filter_matches_hyphenated_air_conditioner():
+    # HiFi writes "air-conditioner" with a hyphen; must still match.
+    assert filters.is_mobile_ac("ESSENTIEL-B Mobile air-conditioner ECMR142") is True
+    assert filters.is_mobile_ac("LISTO Mobile air-conditioner CM5 R290") is True
+
+
 def test_dehumidifier_nuance_in_core_filter():
     # AC with dehumidify *function* is kept; a pure dehumidifier is dropped.
     assert filters.is_mobile_ac(
