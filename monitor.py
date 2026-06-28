@@ -56,13 +56,41 @@ def print_table(products: list[Product]) -> None:
         print(f"  [{flag}] {p.price_str():>9} · {p.retailer:12} · {p.name}{rating}")
 
 
+def smoke_test() -> int:
+    """Send a single, clearly-labelled test alert to verify Telegram delivery.
+
+    Does not scrape any retailer and never writes state — purely a check that
+    the bot token / chat id work end-to-end (e.g. from GitHub Actions).
+    """
+    if not notifier.is_configured():
+        print("Telegram not configured (set TELEGRAM_BOT_TOKEN / "
+              "TELEGRAM_CHAT_ID).", file=sys.stderr)
+        return 1
+    probe = Product(
+        retailer="SMOKE TEST",
+        name="🧪 TEST — ignore. Telegram delivery check, not a real product.",
+        url="https://github.com/mattmccall/ac-stock-monitor",
+        in_stock=True,
+        price=0.0,
+    )
+    notifier.send(probe)
+    print("Smoke-test alert sent.")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Mobile AC stock monitor")
     parser.add_argument("--dry-run", action="store_true",
                         help="don't send Telegram or write state")
     parser.add_argument("--list", action="store_true",
                         help="just print the current filtered AC list and exit")
+    parser.add_argument("--smoke-test", action="store_true",
+                        help="send one labelled test Telegram alert and exit "
+                             "(no scraping, no state changes)")
     args = parser.parse_args()
+
+    if args.smoke_test:
+        return smoke_test()
 
     print("Fetching retailers...")
     products, errors = collect()

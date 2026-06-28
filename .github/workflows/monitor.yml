@@ -3,7 +3,12 @@ name: AC stock monitor
 on:
   schedule:
     - cron: "*/10 * * * *"   # every 10 minutes (UTC)
-  workflow_dispatch: {}        # manual run button
+  workflow_dispatch:           # manual run button
+    inputs:
+      smoke_test:
+        description: "Send a Telegram test alert and exit (no scraping/state)"
+        type: boolean
+        default: false
 
 # Allow the job to commit the updated state file back to the repo.
 permissions:
@@ -34,13 +39,19 @@ jobs:
         run: python tests/test_stock_parsing.py
 
       - name: Install Playwright Chromium
+        if: ${{ inputs.smoke_test != true }}
         run: python -m playwright install --with-deps chromium
 
       - name: Run monitor
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python monitor.py
+        run: |
+          if [[ "${{ inputs.smoke_test }}" == "true" ]]; then
+            python monitor.py --smoke-test
+          else
+            python monitor.py
+          fi
 
       - name: Commit updated state
         run: |
