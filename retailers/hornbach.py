@@ -67,7 +67,7 @@ def _parse_rating(chunk: str) -> str | None:
         return None
     value = m.group(1).replace(",", ".")
     cnt = _RATING_COUNT_RE.search(chunk)
-    return f"{value}/5 ({cnt.group(1)} avis)" if cnt else f"{value}/5"
+    return f"{value}/5 ({cnt.group(1)} reviews)" if cnt else f"{value}/5"
 
 
 def _parse_stock(chunk: str) -> bool | None:
