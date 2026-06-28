@@ -7,3 +7,4 @@ __pycache__/
 # Local state files (e.g. HiFi-only run); the committed one is state.json
 *_state.json
 hifi_state.json
+.tools/
