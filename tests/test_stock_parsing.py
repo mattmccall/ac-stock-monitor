@@ -299,6 +299,28 @@ def test_vu_product_in_stock_and_delivery_days():
     assert days == 12
 
 
+def test_core_filter_drops_evaporative_and_tent_coolers():
+    for name in [
+        "Climatiseur portable pour tentes d'extérieur",
+        "Rafraîchisseur d'air mobile",
+        "Climatiseur mobile évaporatif sans évacuation",
+        "Portable air cooler for outdoor / tent use",
+    ]:
+        assert filters.is_mobile_ac(name) is False, name
+
+
+def test_core_filter_keeps_hose_vented_ac_with_evacuation():
+    # A real monobloc HAS an exhaust ("tuyau d'évacuation") — must NOT be
+    # confused with "sans évacuation" (evaporative).
+    assert filters.is_mobile_ac(
+        "Climatiseur mobile Hantech avec tuyau d'évacuation 18000 BTU") is True
+
+
+def test_core_filter_word_boundary_keeps_attente():
+    assert filters.is_mobile_ac(
+        "Climatiseur mobile sans attente 9000 BTU") is True
+
+
 def test_dehumidifier_nuance_in_core_filter():
     # AC with dehumidify *function* is kept; a pure dehumidifier is dropped.
     assert filters.is_mobile_ac(

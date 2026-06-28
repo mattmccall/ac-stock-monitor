@@ -15,6 +15,8 @@ final judgement call is yours.
 
 from __future__ import annotations
 
+import re
+
 from retailers.base import Product
 
 MAX_PRICE = 450.0  # EUR, inclusive
@@ -61,11 +63,23 @@ EXCLUDE_KEYWORDS = [
 # at Vente-unique). Only a *pure* dehumidifier (no AC keyword) is excluded.
 _DEHUMID = ("déshumidificateur", "deshumidificateur")
 
+# Evaporative / tent / outdoor "coolers" masquerading as portable ACs. A real
+# monobloc vents hot air out a window via a hose, so it can't work in a tent or
+# outdoors — that framing is the tell. Word boundaries keep "tente" from
+# matching "attente"/"contente"; "sans évacuation" (no exhaust) is matched but
+# plain "évacuation" (a hose-vented AC HAS one) is NOT. Applies to every
+# retailer as a general safeguard.
+_EVAP_RE = re.compile(
+    r"\btentes?\b|\btents?\b|ext[ée]rieur|rafra[îi]chisseur|"
+    r"[ée]vaporatif|evaporative|sans\s+[ée]vacuation", re.I)
+
 
 def is_mobile_ac(name: str) -> bool:
     low = name.lower()
     if any(bad in low for bad in EXCLUDE_KEYWORDS):
         return False
+    if _EVAP_RE.search(name):
+        return False  # evaporative / tent / outdoor cooler, not a real AC
     is_ac = any(good in low for good in INCLUDE_KEYWORDS)
     if any(d in low for d in _DEHUMID) and not is_ac:
         return False  # pure dehumidifier
