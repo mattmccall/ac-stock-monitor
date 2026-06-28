@@ -12,5 +12,26 @@
     "price": 169.0,
     "retailer": "Hornbach.lu",
     "url": "https://www.hornbach.lu/fr/p/climatiseur-mobile-hantech-9000-btu-62-4-m-350-m-h/12743874/"
+  },
+  "Vente-unique.lu:codilam-climatiseur-mobile-2-en-1-fonction-deshumidificateur": {
+    "in_stock": false,
+    "name": "Climatiseur mobile 2 en 1 fonction déshumidificateur - Blanc - CODILAM",
+    "price": 239.31,
+    "retailer": "Vente-unique.lu",
+    "url": "https://www.vente-unique.lu/p/codilam-climatiseur-mobile-2-en-1-fonction-deshumidificateur-blanc-codilam"
+  },
+  "Vente-unique.lu:olimpia-splendid-02562-climatiseur-portatif-blanc": {
+    "in_stock": false,
+    "name": "Olimpia Splendid 02562 Climatiseur portatif Blanc",
+    "price": 350.26,
+    "retailer": "Vente-unique.lu",
+    "url": "https://www.vente-unique.lu/p/olimpia-splendid-02562-climatiseur-portatif-blanc"
+  },
+  "Vente-unique.lu:olimpia-splendid-peler-4t-climatiseur-portatif-4-l-blanc": {
+    "in_stock": false,
+    "name": "Olimpia Splendid Peler 4T Climatiseur portatif 4 L Blanc",
+    "price": 112.18,
+    "retailer": "Vente-unique.lu",
+    "url": "https://www.vente-unique.lu/p/olimpia-splendid-peler-4t-climatiseur-portatif-4-l-blanc"
   }
 }
