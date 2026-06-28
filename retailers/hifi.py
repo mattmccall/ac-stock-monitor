@@ -1,30 +1,24 @@
 """HiFi.lu adapter.
 
-Plain HTTP, no JS. Each product tile exposes: name, price ("€398.00"), a spec
-line "Cooling capacity: 9000" (BTU), and a stock string. Product links are
-absolute under /en/p/.
+HiFi.lu sits behind Akamai bot protection: plain HTTP and bundled headless
+Chromium both get a cached HTTP 500. Only a *real* Google Chrome (driven by
+Playwright via channel="chrome", headless is fine) is served the real page —
+so this adapter is LOCAL-ONLY (it needs Chrome installed and an allowed
+network; it is disabled in CI via DISABLE_RETAILERS).
 
-IMPORTANT — stock logic (per project decision):
-We do NOT match a positive "in stock" string, because no in-stock example was
-available to confirm its exact markup. Instead a product is considered IN STOCK
-when the known out-of-stock marker ("Out of stock") is ABSENT from its tile.
-The raw stock text we extracted is logged for every product on every run, so
-the first real restock is captured even if the positive markup differs from a
-guess — and we can refine from the logged output.
+Each product card exposes: name (brand + model), price (€, possibly a struck
+original + sale price), a spec line "Cooling capacity: N" (BTU), and a stock
+string.
 
-NOTE: hifi.lu geo/IP-blocks some networks with a cached HTTP 500 (it was
-unreachable from the dev sandbox). The adapter degrades gracefully: on any
-non-200 or parse failure it logs and returns [] so the other retailers keep
-working. Tile-markup details below are therefore best-effort until validated
-against real logged output.
+Stock logic (per project decision): we do NOT match a positive in-stock
+string. A product is IN STOCK when the known out-of-stock markers are ABSENT
+("out of stock" / "currently unavailable"). The raw status is logged for every
+product on every run so a real restock is captured even if wording shifts.
 """
 
 from __future__ import annotations
 
-import html as ihtml
 import re
-
-import requests
 
 from .base import Product, RetailerAdapter
 
@@ -33,118 +27,131 @@ CATEGORY_URL = (
     "big-appliances-and-household/air-conditioning/mobile-air-conditioner"
 )
 BASE = "https://www.hifi.lu"
-TIMEOUT = 25
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
+USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+)
+
+OOS_MARKERS = ("out of stock", "currently unavailable")
+
+# Browser-side extraction: one record per product card (href, img alt, text).
+_EXTRACT_JS = r"""
+() => {
+  const out = [];
+  const seen = new Set();
+  for (const a of document.querySelectorAll('a[href^="/en/p/"]')) {
+    const href = a.getAttribute('href');
+    if (seen.has(href)) continue;
+    let el = a;
+    for (let i = 0; i < 7 && el.parentElement; i++) {
+      el = el.parentElement;
+      if (el.innerText && /€/.test(el.innerText)) break;
+    }
+    const img = el.querySelector('img');
+    seen.add(href);
+    out.push({href, alt: img ? img.getAttribute('alt') : null, text: el.innerText});
+  }
+  return out;
 }
+"""
 
-OOS_MARKER = "out of stock"
-
-_LINK_RE = re.compile(r'href="(?:https?://www\.hifi\.lu)?(/en/p/[^"#?]+)"')
-_PRICE_RE = re.compile(r"€\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)")
+_PRICE_RE = re.compile(r"€\s*([\d.,]+)")
 _BTU_RE = re.compile(r"Cooling capacity:\s*(\d{3,6})", re.I)
-_TAG_RE = re.compile(r"<[^>]+>")
-_TITLE_ATTR_RE = re.compile(r'title="([^"]+)"')
+_REVIEWS_RE = re.compile(r"^\d+\s+reviews?$", re.I)
+_PCT_RE = re.compile(r"^-?\d+%$")
+_BADGES = {"sales", "new", "promo", "soldes", "sale"}
 
 
-def _clean(s: str) -> str:
-    return ihtml.unescape(_TAG_RE.sub(" ", s)).strip()
-
-
-def _parse_price(seg: str) -> float | None:
-    m = _PRICE_RE.search(seg)
-    if not m:
-        return None
-    raw = m.group(1)
-    # European formats: "398.00" / "398,00" / "1.398,00" / "1,398.00"
-    if "," in raw and "." in raw:
-        # last separator is the decimal one
-        if raw.rfind(",") > raw.rfind("."):
-            raw = raw.replace(".", "").replace(",", ".")
-        else:
-            raw = raw.replace(",", "")
-    elif "," in raw:
-        raw = raw.replace(",", ".")
-    try:
-        return float(raw)
-    except ValueError:
-        return None
-
-
-def _slug_to_name(path: str) -> str:
-    tail = path.rstrip("/").split("/")[-1]
-    tail = re.sub(r"-?\d+$", "", tail)  # drop trailing id if present
-    return tail.replace("-", " ").strip().title() or path
-
-
-def _segment_tiles(html: str) -> list[tuple[str, str]]:
-    """Return (product_path, tile_html) for each product on the page.
-
-    We don't know HiFi's exact tile container, so we segment the page by
-    product-link positions: a tile spans from one product's first link to the
-    next product's first link. Consecutive links to the same product (image +
-    title) are collapsed.
-    """
-    points: list[tuple[str, int]] = []
-    for m in _LINK_RE.finditer(html):
-        path = m.group(1)
-        if points and points[-1][0] == path:
+def _card_name(text: str, alt: str | None) -> str:
+    """First meaningful line of the card (brand + model)."""
+    for line in (text or "").splitlines():
+        line = line.strip()
+        if not line or len(line) <= 4:
             continue
-        points.append((path, m.start()))
-    tiles: list[tuple[str, str]] = []
-    for i, (path, pos) in enumerate(points):
-        end = points[i + 1][1] if i + 1 < len(points) else len(html)
-        tiles.append((path, html[pos:end]))
-    return tiles
+        low = line.lower()
+        if (low in _BADGES or low.startswith("€") or low.startswith("this product")
+                or _REVIEWS_RE.match(line) or _PCT_RE.match(line)):
+            continue
+        return line
+    return (alt or "").strip() or "Mobile air conditioner"
 
 
-def _tile_name(seg: str, path: str) -> str:
-    m = _TITLE_ATTR_RE.search(seg)
-    if m and len(m.group(1)) > 3:
-        return ihtml.unescape(m.group(1)).strip()
-    # first non-trivial anchor/text content
-    txt = _clean(seg)
-    first = txt.split("  ")[0].strip()
-    if len(first) > 3:
-        return first
-    return _slug_to_name(path)
+def _card_price(text: str) -> float | None:
+    """Lowest € amount on the card = the actual (possibly sale) price."""
+    prices = []
+    for raw in _PRICE_RE.findall(text or ""):
+        raw = raw.strip().rstrip(".")
+        if "," in raw and "." in raw:
+            raw = (raw.replace(".", "").replace(",", ".")
+                   if raw.rfind(",") > raw.rfind(".") else raw.replace(",", ""))
+        elif "," in raw:
+            raw = raw.replace(",", ".")
+        try:
+            prices.append(float(raw))
+        except ValueError:
+            continue
+    return min(prices) if prices else None
 
 
-def parse_tiles_html(html: str) -> list[Product]:
+def _card_stock(text: str) -> bool:
+    low = (text or "").lower()
+    return not any(m in low for m in OOS_MARKERS)
+
+
+def _article_id(href: str) -> str:
+    m = re.search(r"/en/p/([^-/]+)", href)
+    return m.group(1) if m else href.rstrip("/").split("/")[-1]
+
+
+def parse_cards(cards: list[dict]) -> list[Product]:
+    """Pure parse of browser-extracted card records into Products."""
     products: list[Product] = []
-    seen: set[str] = set()
-    for path, seg in _segment_tiles(html):
-        if path in seen:
+    for c in cards:
+        href = c.get("href") or ""
+        if "/en/p/" not in href:
             continue
-        seen.add(path)
-        low = seg.lower()
-        raw_status = "Out of stock" if OOS_MARKER in low else "(no OOS marker)"
-        in_stock = OOS_MARKER not in low
-        name = _tile_name(seg, path)
-        btu_m = _BTU_RE.search(seg)
+        text = c.get("text") or ""
+        name = _card_name(text, c.get("alt"))
+        price = _card_price(text)
+        btu_m = _BTU_RE.search(text)
         btu = int(btu_m.group(1)) if btu_m else None
-        url = BASE + path
-        # Per-product raw status logging (every run) for later refinement.
-        print(f"  [HiFi] {name[:50]:50} | raw_status={raw_status:18} "
-              f"-> in_stock={in_stock} | btu={btu}")
+        in_stock = _card_stock(text)
+        url = BASE + href if href.startswith("/") else href
+        raw_status = ("in stock" if in_stock
+                      else next(m for m in OOS_MARKERS if m in text.lower()))
+        print(f"  [HiFi] {name[:48]:48} | raw_status={raw_status:20} "
+              f"-> in_stock={in_stock} | btu={btu} | €{price}")
         products.append(
             Product(
                 retailer=HifiAdapter.name,
                 name=name,
                 url=url,
                 in_stock=in_stock,
-                price=_parse_price(seg),
+                price=price,
                 btu=btu,
                 specs=f"{btu} BTU" if btu else None,
-                product_id=path.rstrip("/").split("/")[-1],
+                product_id=_article_id(href),
             )
         )
     return products
+
+
+def _fetch_cards() -> list[dict]:
+    """Drive real Chrome (Playwright) to get past Akamai; return card records."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(channel="chrome", headless=True)
+        try:
+            page = browser.new_context(
+                locale="en-US", user_agent=USER_AGENT,
+                viewport={"width": 1280, "height": 900},
+            ).new_page()
+            page.goto(CATEGORY_URL, wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_timeout(4000)
+            return page.evaluate(_EXTRACT_JS)
+        finally:
+            browser.close()
 
 
 class HifiAdapter(RetailerAdapter):
@@ -152,13 +159,10 @@ class HifiAdapter(RetailerAdapter):
 
     def fetch(self) -> list[Product]:
         try:
-            resp = requests.get(CATEGORY_URL, headers=HEADERS, timeout=TIMEOUT)
-        except requests.RequestException as exc:
-            print(f"  [HiFi] request failed: {exc}")
+            cards = _fetch_cards()
+        except Exception as exc:
+            # Chrome missing (e.g. CI), Akamai block, or network error.
+            print(f"  [HiFi] fetch failed ({exc.__class__.__name__}: {exc}); "
+                  f"skipping. Needs Google Chrome + an allowed network.")
             return []
-        if resp.status_code != 200:
-            # hifi.lu serves a cached 500 to blocked networks — log and skip.
-            print(f"  [HiFi] HTTP {resp.status_code} (site may be geo/IP-blocking "
-                  f"this runner); skipping.")
-            return []
-        return parse_tiles_html(resp.text)
+        return parse_cards(cards)

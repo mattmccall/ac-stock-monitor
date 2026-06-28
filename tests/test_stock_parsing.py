@@ -12,7 +12,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from retailers.hornbach import _parse_stock, parse_tiles_html  # noqa: E402
-from retailers.hifi import parse_tiles_html as hifi_parse  # noqa: E402
+from retailers.hifi import parse_cards as hifi_parse_cards  # noqa: E402
 from retailers.conforama import parse_grid as conf_parse  # noqa: E402
 import filters  # noqa: E402
 import notifier  # noqa: E402
@@ -93,28 +93,42 @@ def test_parse_tiles_handles_both_negations():
 
 
 # --- HiFi: structured BTU + absence-based stock --------------------------
+# Card records mirror what the browser extractor returns (href, alt, text).
 
-_HIFI_HTML = (
-    '<a href="/en/p/trotec-pac-2610-e-123456" title="Trotec PAC Mobile air '
-    'conditioner">x</a><span>€398.00</span><div>Cooling capacity: 9000</div>'
-    '<a href="/en/p/mini-ac-999" title="Mini mobile air conditioner">y</a>'
-    '<span>€199.00</span><div>Cooling capacity: 7000</div><span>Out of stock</span>'
-)
+_HIFI_CARDS = [
+    {  # in stock (no OOS marker), single price
+        "href": "/en/p/B8010304-mobile-air-conditioner-exm9b2",
+        "alt": "Mobile air-conditioner EXM9b2",
+        "text": "ESSENTIEL-B Mobile air-conditioner EXM9b2\n0 reviews\n€398.00\n"
+                "Cooling capacity: 9000 | Noise level: 65",
+    },
+    {  # out of stock + on sale (must take the LOWER price)
+        "href": "/en/p/13000532-domo-mobile-air-conditioner-do10161",
+        "alt": "Mobile air conditioner DO10161 - 7000 BTU",
+        "text": "Sales\nDOMO Mobile air conditioner DO10161 - 7000 BTU\n0 reviews\n"
+                "€349.00\n€199.00\n-43%\nThis product is currently unavailable\n"
+                "out of stock\nCooling capacity: 7000",
+    },
+]
 
 
-def test_hifi_parses_btu_as_int():
-    prods = {p.name: p for p in hifi_parse(_HIFI_HTML)}
-    trotec = next(p for p in prods.values() if "Trotec" in p.name)
-    assert trotec.btu == 9000 and isinstance(trotec.btu, int)
-    assert trotec.price == 398.00
+def test_hifi_parses_btu_as_int_and_name():
+    prods = {p.product_id: p for p in hifi_parse_cards(_HIFI_CARDS)}
+    p = prods["B8010304"]
+    assert p.btu == 9000 and isinstance(p.btu, int)
+    assert p.price == 398.00
+    assert p.name == "ESSENTIEL-B Mobile air-conditioner EXM9b2"  # not a badge
 
 
-def test_hifi_stock_is_absence_of_out_of_stock():
-    prods = list(hifi_parse(_HIFI_HTML))
-    in_stock = next(p for p in prods if "Trotec" in p.name)
-    out = next(p for p in prods if "Mini" in p.name)
-    assert in_stock.in_stock is True   # no "Out of stock" marker -> in stock
-    assert out.in_stock is False       # marker present -> out
+def test_hifi_stock_is_absence_of_oos_markers():
+    prods = {p.product_id: p for p in hifi_parse_cards(_HIFI_CARDS)}
+    assert prods["B8010304"].in_stock is True    # no OOS marker
+    assert prods["13000532"].in_stock is False   # "out of stock"/"unavailable"
+
+
+def test_hifi_uses_sale_price():
+    prods = {p.product_id: p for p in hifi_parse_cards(_HIFI_CARDS)}
+    assert prods["13000532"].price == 199.00     # lower of 349 / 199
 
 
 # --- soft BTU floor -------------------------------------------------------

@@ -10,7 +10,7 @@ Runs on **GitHub Actions** every 10 minutes; also runnable locally.
 |----------|--------|-------------------|
 | **MediaMarkt.lu** | Shopify `products.json` feed | `variants[].available` boolean (reliable) |
 | **Hornbach.lu** | Category page (JS-rendered, bot-walled) | French text per tile: *"indisponible / non disponible en ligne"* = out, *"Disponible en ligne"* = in. Plain HTTP first, Playwright headless fallback. |
-| **HiFi.lu** | Category page (plain HTTP) | Structured BTU (`Cooling capacity: N`) parsed to int; **in stock = absence of "Out of stock"** (no positive string assumed). Raw status logged per product. ⚠️ **geo/IP-blocks all cloud runners** (cached 500 / timeout) — works only from a Luxembourg/allowed network. Disabled in CI (see below); run it locally. |
+| **HiFi.lu** | Category page via **real Google Chrome** (Playwright `channel="chrome"`, headless) | Behind Akamai bot protection: plain HTTP and bundled Chromium get a cached 500; only real Chrome is served the page. Cards parsed from the DOM: name, lowest € (sale-aware) price, structured BTU (`Cooling capacity: N` → int), and **in stock = absence of "out of stock" / "currently unavailable"** (no positive string assumed). Raw status logged per product. ⚠️ **Local-only**: needs Google Chrome installed + an allowed network. Disabled in CI; runs via the local launchd agent (see below). |
 | **Conforama.lu** | Odoo grid + `?search=climatiseur` (plain HTTP) | Grid gives name/price/URL; stock read from the **product page** (absence of OOS markers). Low-priority/low-yield, fully isolated. |
 
 The soft BTU floor (`BTU_SOFT_FLOOR`, default 8000) does not exclude units —
@@ -79,8 +79,28 @@ STATE_PATH=hifi_state.json \
 python monitor.py
 ```
 
-`*_state.json` is gitignored. Run it on demand, or schedule it locally
-(launchd/cron). Alerts go to the same Telegram chat.
+`*_state.json` is gitignored. Alerts go to the same Telegram chat.
+
+Requires **Google Chrome** installed (HiFi is fetched via real Chrome to get
+past Akamai bot protection).
+
+#### Automated locally with launchd (every 15 min)
+
+`run_hifi_local.sh` + a launchd agent run the HiFi check every 15 minutes while
+the Mac is awake. Because the project lives under `~/Documents` (a macOS
+privacy-protected folder), the launchd-spawned process needs **Full Disk
+Access** granted to `/bin/bash` (System Settings → Privacy & Security → Full
+Disk Access). The agent runs `/bin/bash run_hifi_local.sh` (no `exec`, so bash
+stays the responsible process and its grant covers the Python + Chrome it
+launches).
+
+```bash
+# install / reload the agent
+launchctl bootout  gui/$(id -u)/com.mattmccall.ac-hifi-monitor 2>/dev/null
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.mattmccall.ac-hifi-monitor.plist
+launchctl kickstart -k gui/$(id -u)/com.mattmccall.ac-hifi-monitor   # run now
+# logs: hifi_local.log
+```
 ```
 
 ## Telegram setup
