@@ -68,6 +68,21 @@ python monitor.py           # real run: alert + persist state
 DISABLE_RETAILERS="HiFi.lu,Conforama.lu" python monitor.py --dry-run
 ```
 
+### Running HiFi.lu locally (it can't run in CI)
+
+From an allowed network, check **only** HiFi against its **own** state file
+(`STATE_PATH`) so it never collides with the `state.json` the Action commits:
+
+```bash
+DISABLE_RETAILERS="MediaMarkt.lu,Hornbach.lu,Conforama.lu" \
+STATE_PATH=hifi_state.json \
+python monitor.py
+```
+
+`*_state.json` is gitignored. Run it on demand, or schedule it locally
+(launchd/cron). Alerts go to the same Telegram chat.
+```
+
 ## Telegram setup
 
 1. Message [@BotFather](https://t.me/BotFather) → `/newbot` → copy the **token**.

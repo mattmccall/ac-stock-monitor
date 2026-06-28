@@ -17,6 +17,16 @@ from retailers.base import Product
 DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "state.json")
 
 
+def _resolve(path: str | None) -> str:
+    """Pick the state file: explicit arg > STATE_PATH env > default.
+
+    The STATE_PATH override lets a local run (e.g. HiFi-only, which can't run
+    in CI) keep its own state file so it never clashes with the state.json the
+    GitHub Action commits.
+    """
+    return path or os.environ.get("STATE_PATH") or DEFAULT_PATH
+
+
 @dataclass
 class Transition:
     """A product that just became available."""
@@ -24,7 +34,8 @@ class Transition:
     product: Product
 
 
-def load_state(path: str = DEFAULT_PATH) -> dict:
+def load_state(path: str | None = None) -> dict:
+    path = _resolve(path)
     if not os.path.exists(path):
         return {}
     try:
@@ -35,7 +46,8 @@ def load_state(path: str = DEFAULT_PATH) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def save_state(state: dict, path: str = DEFAULT_PATH) -> None:
+def save_state(state: dict, path: str | None = None) -> None:
+    path = _resolve(path)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False, indent=2, sort_keys=True)
         f.write("\n")
