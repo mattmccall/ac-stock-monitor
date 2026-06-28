@@ -48,6 +48,12 @@ _EXCLUDE_TERMS = (
     "candy pura", "aufit", "rafraîchisseur", "rafraichisseur",
     "sans évacuation", "sans evacuation",
 )
+# Tent / outdoor framing => almost certainly an evaporative cooler or spot
+# cooler, not a hose-vented monobloc (you can't vent hot air out of a tent).
+# Word boundaries so "tente" doesn't match inside "attente"/"contente" etc.
+_EVAP_NAME_RE = re.compile(r"\btentes?\b|\btents?\b|ext[ée]rieur", re.I)
+
+_BTU_RE = re.compile(r"(\d{3,5})\s*BTU", re.I)
 _DELIVERY_RE = re.compile(
     r"(?:exp[ée]di[ée]|livr[ée]e?|livraison)\s+(?:sous|en|entre[^.\d]*?)\s*"
     r"(\d+)(?:\s*(?:à|-|et)\s*(\d+))?\s*jours?", re.I)
@@ -64,6 +70,8 @@ def in_scope(name: str) -> bool:
     low = name.lower()
     if any(t in low for t in _EXCLUDE_TERMS):
         return False
+    if _EVAP_NAME_RE.search(name):
+        return False  # tent/outdoor cooler, not a real monobloc AC
     if "split" in low and not ("split mobile" in low or "portasplit" in low):
         return False
     # pure dehumidifier (dehumidify only, not an AC)
@@ -172,12 +180,15 @@ class VenteUniqueAdapter(RetailerAdapter):
             except requests.RequestException as exc:
                 print(f"  [Vente-unique] product fetch failed for {name[:40]}: {exc}")
                 continue
-            print(f"  [Vente-unique] {name[:46]:46} | {raw} | €{price} "
+            btu_m = _BTU_RE.search(pr.text)
+            btu = int(btu_m.group(1)) if btu_m else None
+            print(f"  [Vente-unique] {name[:46]:46} | {raw} | btu={btu} | €{price} "
                   f"-> in_stock={in_stock}")
             products.append(
                 Product(
                     retailer=self.name, name=name, url=url, in_stock=in_stock,
-                    price=price, delivery_days=delivery_days, product_id=pid,
+                    price=price, delivery_days=delivery_days, btu=btu,
+                    specs=f"{btu} BTU" if btu else None, product_id=pid,
                 )
             )
         return products

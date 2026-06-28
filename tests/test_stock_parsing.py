@@ -235,7 +235,6 @@ def test_batiself_out_when_no_store_has_stock():
 def test_vu_scope_keeps_portables():
     for name in [
         "Climatiseur Inverter Comfee CF 9000 BTU avec Wi-Fi, Réversible, Déshumidificateur",
-        "Climatiseur portable IceCove pour tentes d'extérieur",
         "Olimpia Splendid Peler 4T Climatiseur portatif",
         "Climatiseur mobile 2 en 1 fonction déshumidificateur - CODILAM",
         "Olimpia Splendid Unico Easy S2 HP Climatiseur portatif",
@@ -256,6 +255,18 @@ def test_vu_scope_drops_mural_split_brands_and_evap():
         "Déshumidificateur 20L",                       # pure dehumidifier
     ]:
         assert vu_in_scope(name) is False, name
+
+
+def test_vu_scope_drops_tent_outdoor_coolers():
+    # "for tents / outdoor" => evaporative, not a hose-vented monobloc.
+    assert vu_in_scope(
+        "Climatiseur portable IceCove pour tentes d'extérieur et usage intérieur") is False
+    assert vu_in_scope("Climatiseur portable pour tente de camping") is False
+
+
+def test_vu_scope_word_boundary_does_not_drop_attente_etc():
+    # "tente" must not match inside unrelated words like "attente".
+    assert vu_in_scope("Climatiseur mobile sans attente de livraison 9000 BTU") is True
 
 
 def test_vu_scope_keeps_portasplit_and_split_mobile():
