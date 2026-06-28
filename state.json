@@ -1,1 +1,16 @@
-{}
+{
+  "Hornbach.lu:12743873": {
+    "in_stock": false,
+    "name": "Climatiseur mobile HANTECH 12000BTU VDE 380 m³/h",
+    "price": 249.0,
+    "retailer": "Hornbach.lu",
+    "url": "https://www.hornbach.lu/fr/p/climatiseur-mobile-hantech-12000btu-vde-380-m-h/12743873/"
+  },
+  "Hornbach.lu:12743874": {
+    "in_stock": false,
+    "name": "Climatiseur mobile Hantech 9000 BTU 62,4 m³ 350 m³/h",
+    "price": 169.0,
+    "retailer": "Hornbach.lu",
+    "url": "https://www.hornbach.lu/fr/p/climatiseur-mobile-hantech-9000-btu-62-4-m-350-m-h/12743874/"
+  }
+}
