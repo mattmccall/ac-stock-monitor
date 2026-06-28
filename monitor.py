@@ -15,6 +15,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 import filters
@@ -32,10 +33,20 @@ except ImportError:
 
 
 def collect() -> tuple[list[Product], list[str]]:
-    """Run every adapter; collect products and any per-adapter errors."""
+    """Run every adapter; collect products and any per-adapter errors.
+
+    Retailers named in the DISABLE_RETAILERS env var (comma-separated, matched
+    against adapter.name) are skipped. Used in CI to skip HiFi.lu, which
+    geo/IP-blocks cloud runners — it still runs locally where the var is unset.
+    """
+    disabled = {n.strip() for n in os.environ.get("DISABLE_RETAILERS", "").split(",")
+                if n.strip()}
     products: list[Product] = []
     errors: list[str] = []
     for adapter in ADAPTERS:
+        if adapter.name in disabled:
+            print(f"  {adapter.name}: skipped (DISABLE_RETAILERS)")
+            continue
         try:
             found = adapter.fetch()
             products.extend(found)

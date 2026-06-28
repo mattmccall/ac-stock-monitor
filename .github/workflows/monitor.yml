@@ -49,6 +49,9 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # HiFi.lu geo/IP-blocks cloud runners (timeout). Skip it in CI; it
+          # still runs locally, where this var is unset.
+          DISABLE_RETAILERS: "HiFi.lu"
         run: |
           if [[ "${{ inputs.smoke_test }}" == "true" ]]; then
             python monitor.py --smoke-test
