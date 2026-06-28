@@ -33,6 +33,9 @@ class Product:
     # Structured cooling capacity in BTU, when the retailer exposes it as a
     # parseable field (HiFi does). Used for the soft BTU floor in the filter.
     btu: int | None = None
+    # Delivery lead time in days, when the retailer exposes it (Batiself).
+    # Surfaced in the alert; feeds the "≤10 days" judgement.
+    delivery_days: int | None = None
 
     @property
     def key(self) -> str:

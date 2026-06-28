@@ -51,6 +51,8 @@ def format_message(product: Product) -> str:
         lines.append(spec)
     elif product.specs:
         lines.append(f"📐 {html.escape(product.specs)}")
+    if product.delivery_days is not None:
+        lines.append(f"🚚 Delivery: {product.delivery_days} days")
     lines.append(f'🔗 <a href="{html.escape(product.url, quote=True)}">View product</a>')
     return "\n".join(lines)
 

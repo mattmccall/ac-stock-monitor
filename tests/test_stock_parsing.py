@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from retailers.hornbach import _parse_stock, parse_tiles_html  # noqa: E402
 from retailers.hifi import parse_cards as hifi_parse_cards  # noqa: E402
 from retailers.conforama import parse_grid as conf_parse  # noqa: E402
+from retailers.batiself import parse_category as bati_parse, resolve_stock  # noqa: E402
 import filters  # noqa: E402
 import notifier  # noqa: E402
 from retailers.base import Product  # noqa: E402
@@ -174,6 +175,58 @@ def test_conforama_grid_parse():
     assert prods[0].name == "Climatiseur mobile X"
     assert prods[0].price == 299.0
     assert prods[0].url.startswith("https://www.conforama.lu/shop/")
+
+
+# --- Batiself: WooCommerce tiles + per-page stock/store/delivery ----------
+
+def _bati_tile(pid, slug, name, price):
+    return (
+        f'data-product-id="{pid}">'
+        f'<a href="https://batiself.lu/produit/{slug}/" class="product-card__media"></a>'
+        f'<a href="https://batiself.lu/produit/{slug}/" class="product-card__title">{name}</a>'
+        f'<span class="woocommerce-Price-amount"><bdi>{price}&nbsp;'
+        f'<span class="woocommerce-Price-currencySymbol">€</span></bdi></span>'
+    )
+
+
+def test_batiself_tile_parse_and_dehumidifier_exclusion():
+    html = (
+        _bati_tile("111", "climatiseur-mobile-x", "Climatiseur mobile X 9000 BTU", "299,00")
+        + _bati_tile("222", "deshumidificateur-y", "Déshumidificateur Y 20L", "149,00")
+    )
+    prods = bati_parse(html)
+    assert len(prods) == 1                         # dehumidifier excluded
+    assert prods[0].name == "Climatiseur mobile X 9000 BTU"
+    assert prods[0].price == 299.00
+    assert prods[0].product_id == "111"
+    assert prods[0].url.endswith("/produit/climatiseur-mobile-x/")
+
+
+def _resolve(html):
+    p = Product("Batiself.lu", "Climatiseur mobile X", "u", in_stock=False)
+    resolve_stock(p, html)
+    return p
+
+
+def test_batiself_in_stock_requires_store_and_no_oos():
+    # store with stock>0 and no OOS string + delivery line -> in stock
+    p = _resolve('data-stocks=\'{"131":{"name":"Alzingen","stock":3},'
+                 '"903":{"name":"Schifflange","stock":0}}\' '
+                 'Délais de livraison: 7 jours')
+    assert p.in_stock is True
+    assert p.delivery_days == 7
+
+
+def test_batiself_out_when_oos_string_present():
+    p = _resolve('data-stocks=\'{"131":{"name":"Alzingen","stock":3}}\' '
+                 "Ce produit n'est pas disponible pour l'instant")
+    assert p.in_stock is False     # OOS string overrides store stock
+
+
+def test_batiself_out_when_no_store_has_stock():
+    p = _resolve('data-stocks=\'{"131":{"name":"Alzingen","stock":0},'
+                 '"903":{"name":"Schifflange","stock":0}}\'')
+    assert p.in_stock is False     # no store in stock -> not purchase-worthy
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ the project needs to change.
 """
 
 from .base import Product, RetailerAdapter
+from .batiself import BatiselfAdapter
 from .conforama import ConforamaAdapter
 from .hifi import HifiAdapter
 from .hornbach import HornbachAdapter
@@ -17,6 +18,7 @@ ADAPTERS: list[RetailerAdapter] = [
     MediaMarktAdapter(),
     HornbachAdapter(),
     HifiAdapter(),
+    BatiselfAdapter(),
     ConforamaAdapter(),
 ]
 
