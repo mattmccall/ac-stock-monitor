@@ -1,4 +1,18 @@
 {
+  "Hornbach.lu:10514051": {
+    "in_stock": false,
+    "name": "Climatiseur mobile PAC EM90 Silent pièces jusqu'à 95 m³ avec tuyau d'évacuation de l'air d'1,2 m + télécommande De 'Longhi climatiseur local",
+    "price": 499.99,
+    "retailer": "Hornbach.lu",
+    "url": "https://www.hornbach.lu/fr/p/climatiseur-mobile-pac-em90-silent-pieces-jusqua-95-m-avec-tuyau-devacuation-de-lair-d1-2-m-telecommande-de-longhi-climatiseur-local/10514051/"
+  },
+  "Hornbach.lu:10601576": {
+    "in_stock": false,
+    "name": "Climatiseur mobile Hantech avec tuyau d'évacuation 18.000 Tuya jusqu'à une taille de pièce de 55m²/132m³ blanc",
+    "price": 499.0,
+    "retailer": "Hornbach.lu",
+    "url": "https://www.hornbach.lu/fr/p/climatiseur-mobile-hantech-avec-tuyau-devacuation-18-000-tuya-jusqua-une-taille-de-piece-de-55m-132m-blanc/10601576/"
+  },
   "Hornbach.lu:12743873": {
     "in_stock": false,
     "name": "Climatiseur mobile HANTECH 12000BTU VDE 380 m³/h",
@@ -12,6 +26,13 @@
     "price": 169.0,
     "retailer": "Hornbach.lu",
     "url": "https://www.hornbach.lu/fr/p/climatiseur-mobile-hantech-9000-btu-62-4-m-350-m-h/12743874/"
+  },
+  "Vente-unique.lu:climatiseur-inverter-comfee-cf-9000-btu-avec-wi-fi-a-a-rever": {
+    "in_stock": true,
+    "name": "Climatiseur Inverter Comfee CF 9000 BTU avec Wi-Fi, A++/A+, Réversible, Déshumidificateur, Blanc",
+    "price": 494.1,
+    "retailer": "Vente-unique.lu",
+    "url": "https://www.vente-unique.lu/p/climatiseur-inverter-comfee-cf-9000-btu-avec-wi-fi-a-a-reversible-deshumidificateur-blanc"
   },
   "Vente-unique.lu:codilam-climatiseur-mobile-2-en-1-fonction-deshumidificateur": {
     "in_stock": false,
