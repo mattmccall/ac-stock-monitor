@@ -28,7 +28,13 @@ import requests
 from .base import Product, RetailerAdapter
 
 BASE = "https://www.vente-unique.lu"
-CATEGORY_URL = "https://www.vente-unique.lu/c/climatiseur-mobile"
+# Use the *monobloc* category, not /c/climatiseur-mobile: the latter is a mixed
+# bag that lists wall-mounted inverter splits (Comfee CF, Aermec, Daikin, Baxi
+# Sidera...) alongside real portables. /c/climatiseur-monobloc is VU's own
+# "hose-vented portable" category, so it structurally excludes the splits — no
+# brand-guessing needed. (The in_scope() filter below stays as a safety net,
+# e.g. it still drops the IceCove tent cooler that VU files under monobloc.)
+CATEGORY_URL = "https://www.vente-unique.lu/c/climatiseur-monobloc"
 TIMEOUT = 25
 MAX_STOCK_CHECKS = 20
 
