@@ -78,6 +78,44 @@ def smoke_test() -> int:
     return 0
 
 
+def heartbeat() -> int:
+    """Daily liveness confirmation.
+
+    Runs a real fetch + filter (so it proves Actions, the scrapers, and
+    Telegram are all working) and sends a short summary. Deliberately does NOT
+    diff or write state, so it can run alongside the regular 10-minute check
+    without racing on state.json.
+    """
+    if not notifier.is_configured():
+        print("Telegram not configured.", file=sys.stderr)
+        return 1
+
+    from datetime import datetime, timezone
+
+    products, errors = collect()
+    ac = filters.filter_products(products)
+    in_now = [p for p in ac if p.in_stock]
+
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    lines = [
+        "✅ <b>Moniteur AC actif</b>",
+        f"🕛 {stamp}",
+        f"🔎 {len(products)} produit(s) lus · {len(ac)} clim(s) ≤ "
+        f"€{filters.MAX_PRICE:.0f} suivie(s)",
+    ]
+    if in_now:
+        names = "\n".join(f"• {p.name} ({p.price_str()})" for p in in_now)
+        lines.append(f"🟢 En stock maintenant ({len(in_now)}):\n{names}")
+    else:
+        lines.append("⚪ Aucune en stock pour le moment")
+    if errors:
+        lines.append("⚠️ Erreurs: " + "; ".join(errors))
+
+    notifier.send_text("\n".join(lines))
+    print("Heartbeat sent.")
+    return 1 if errors else 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Mobile AC stock monitor")
     parser.add_argument("--dry-run", action="store_true",
@@ -87,10 +125,15 @@ def main() -> int:
     parser.add_argument("--smoke-test", action="store_true",
                         help="send one labelled test Telegram alert and exit "
                              "(no scraping, no state changes)")
+    parser.add_argument("--heartbeat", action="store_true",
+                        help="send a daily liveness summary (real fetch, but "
+                             "no state changes) and exit")
     args = parser.parse_args()
 
     if args.smoke_test:
         return smoke_test()
+    if args.heartbeat:
+        return heartbeat()
 
     print("Fetching retailers...")
     products, errors = collect()

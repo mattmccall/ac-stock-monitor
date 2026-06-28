@@ -49,19 +49,23 @@ def format_message(product: Product) -> str:
     return "\n".join(lines)
 
 
-def send(product: Product) -> None:
+def send_text(text: str, disable_preview: bool = True) -> None:
     token, chat_id = _credentials()
     resp = requests.post(
         API.format(token=token),
         json={
             "chat_id": chat_id,
-            "text": format_message(product),
+            "text": text,
             "parse_mode": "HTML",
-            "disable_web_page_preview": False,
+            "disable_web_page_preview": disable_preview,
         },
         timeout=TIMEOUT,
     )
     resp.raise_for_status()
+
+
+def send(product: Product) -> None:
+    send_text(format_message(product), disable_preview=False)
 
 
 def is_configured() -> bool:
