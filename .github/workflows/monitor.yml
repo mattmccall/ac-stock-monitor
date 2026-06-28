@@ -2,12 +2,13 @@ name: AC stock monitor
 
 on:
   schedule:
-    # Hourly at :23 (UTC). Off the contended top-of-hour so GitHub is less
-    # likely to delay it; high-frequency crons like */10 get throttled hard.
-    - cron: "23 * * * *"
+    # Every 15 min at :08/:23/:38/:53 (UTC) — off the contended top-of-hour
+    # (and quarter-hours), where GitHub delays scheduled runs the most. Public
+    # repo => Actions minutes are free, so frequent checks cost nothing.
+    - cron: "8,23,38,53 * * * *"
     # Daily heartbeat at 10:23 UTC = ~12:23 Luxembourg in summer (CEST),
-    # 11:23 in winter (CET). Same minute as the hourly cron, so at 10:23 both
-    # fire (one real check + one heartbeat), as before. Cron is UTC-only.
+    # 11:23 in winter (CET). :23 is also in the schedule above, so at 10:23
+    # both fire (one real check + one heartbeat), as before. Cron is UTC-only.
     - cron: "23 10 * * *"
   workflow_dispatch:           # manual run button
     inputs:
