@@ -12,7 +12,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from retailers.hornbach import _parse_stock, parse_tiles_html  # noqa: E402
+from retailers.hifi import parse_tiles_html as hifi_parse  # noqa: E402
+from retailers.conforama import parse_grid as conf_parse  # noqa: E402
 import filters  # noqa: E402
+import notifier  # noqa: E402
 from retailers.base import Product  # noqa: E402
 
 
@@ -87,6 +90,76 @@ def test_parse_tiles_handles_both_negations():
         "Climatiseur B": False,
         "Climatiseur C": True,
     }
+
+
+# --- HiFi: structured BTU + absence-based stock --------------------------
+
+_HIFI_HTML = (
+    '<a href="/en/p/trotec-pac-2610-e-123456" title="Trotec PAC Mobile air '
+    'conditioner">x</a><span>€398.00</span><div>Cooling capacity: 9000</div>'
+    '<a href="/en/p/mini-ac-999" title="Mini mobile air conditioner">y</a>'
+    '<span>€199.00</span><div>Cooling capacity: 7000</div><span>Out of stock</span>'
+)
+
+
+def test_hifi_parses_btu_as_int():
+    prods = {p.name: p for p in hifi_parse(_HIFI_HTML)}
+    trotec = next(p for p in prods.values() if "Trotec" in p.name)
+    assert trotec.btu == 9000 and isinstance(trotec.btu, int)
+    assert trotec.price == 398.00
+
+
+def test_hifi_stock_is_absence_of_out_of_stock():
+    prods = list(hifi_parse(_HIFI_HTML))
+    in_stock = next(p for p in prods if "Trotec" in p.name)
+    out = next(p for p in prods if "Mini" in p.name)
+    assert in_stock.in_stock is True   # no "Out of stock" marker -> in stock
+    assert out.in_stock is False       # marker present -> out
+
+
+# --- soft BTU floor -------------------------------------------------------
+
+def test_underpowered_flagged_not_excluded():
+    weak = Product("HiFi.lu", "Mobile air conditioner", "u",
+                   in_stock=True, price=199.0, btu=7000)
+    assert filters.is_underpowered(weak) is True
+    assert filters.passes(weak) is True     # flagged, NOT excluded
+
+
+def test_adequate_btu_not_flagged():
+    ok = Product("HiFi.lu", "Mobile air conditioner", "u",
+                 in_stock=True, price=398.0, btu=9000)
+    assert filters.is_underpowered(ok) is False
+
+
+def test_no_btu_not_flagged():
+    p = Product("Hornbach.lu", "Climatiseur mobile Hantech", "u",
+                in_stock=True, price=169.0)
+    assert filters.is_underpowered(p) is False
+
+
+def test_alert_text_shows_btu_and_underpowered_warning():
+    weak = Product("HiFi.lu", "Mobile AC", "https://x", in_stock=True,
+                   price=199.0, btu=7000)
+    msg = notifier.format_message(weak)
+    assert "7000 BTU" in msg and "underpowered" in msg
+
+
+# --- Conforama grid parse -------------------------------------------------
+
+def test_conforama_grid_parse():
+    card = (
+        '<div data-product-template-id="290662"><form>'
+        '<a itemprop="url" href="/shop/0500598-climatiseur-mobile-x-290662?category=139">i</a>'
+        '<a itemprop="website_name" title="Climatiseur mobile X" href="/shop/x">'
+        'Climatiseur mobile X</a>'
+        '<span itemprop="price">299.0</span></form></div>'
+    )
+    prods = conf_parse(card)
+    assert len(prods) == 1
+    assert prods[0].name == "Climatiseur mobile X"
+    assert prods[0].price == 299.0
+    assert prods[0].url.startswith("https://www.conforama.lu/shop/")
 
 
 if __name__ == "__main__":

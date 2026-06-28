@@ -12,6 +12,7 @@ import os
 
 import requests
 
+import filters
 from retailers.base import Product
 
 API = "https://api.telegram.org/bot{token}/sendMessage"
@@ -43,7 +44,12 @@ def format_message(product: Product) -> str:
     ]
     if product.rating:
         lines.append(f"⭐ {html.escape(product.rating)}")
-    if product.specs:
+    if product.btu:
+        spec = f"📐 {product.btu} BTU"
+        if filters.is_underpowered(product):
+            spec += f" ⚠️ underpowered (&lt;{filters.BTU_SOFT_FLOOR} BTU)"
+        lines.append(spec)
+    elif product.specs:
         lines.append(f"📐 {html.escape(product.specs)}")
     lines.append(f'🔗 <a href="{html.escape(product.url, quote=True)}">View product</a>')
     return "\n".join(lines)

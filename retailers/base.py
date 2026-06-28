@@ -27,9 +27,12 @@ class Product:
     # Stable identifier within a retailer (Shopify id, Hornbach article id...).
     # Falls back to the URL when the retailer exposes no id.
     product_id: str | None = None
-    # Free-form spec hints (BTU, room size...) surfaced in the alert text.
+    # Free-form spec hints (room size...) surfaced in the alert text.
     # Often already embedded in `name`, so this is optional.
     specs: str | None = None
+    # Structured cooling capacity in BTU, when the retailer exposes it as a
+    # parseable field (HiFi does). Used for the soft BTU floor in the filter.
+    btu: int | None = None
 
     @property
     def key(self) -> str:

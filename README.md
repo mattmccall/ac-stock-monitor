@@ -9,7 +9,13 @@ Runs on **GitHub Actions** every 10 minutes; also runnable locally.
 | Retailer | Source | How stock is read |
 |----------|--------|-------------------|
 | **MediaMarkt.lu** | Shopify `products.json` feed | `variants[].available` boolean (reliable) |
-| **Hornbach.lu** | Category page (JS-rendered, bot-walled) | French text per tile: *"indisponible en ligne actuellement"* = out, *"Disponible en ligne"* = in. Plain HTTP first, Playwright headless fallback. |
+| **Hornbach.lu** | Category page (JS-rendered, bot-walled) | French text per tile: *"indisponible / non disponible en ligne"* = out, *"Disponible en ligne"* = in. Plain HTTP first, Playwright headless fallback. |
+| **HiFi.lu** | Category page (plain HTTP) | Structured BTU (`Cooling capacity: N`) parsed to int; **in stock = absence of "Out of stock"** (no positive string assumed). Raw status logged per product. ⚠️ geo/IP-blocks some networks with a cached HTTP 500 — degrades to 0 products + a log line. |
+| **Conforama.lu** | Odoo grid + `?search=climatiseur` (plain HTTP) | Grid gives name/price/URL; stock read from the **product page** (absence of OOS markers). Low-priority/low-yield, fully isolated. |
+
+The soft BTU floor (`BTU_SOFT_FLOOR`, default 8000) does not exclude units —
+sub-floor ACs are **flagged "underpowered"** in the alert. Only HiFi exposes
+structured BTU today; for the others, capacity is judged from the name.
 
 ## What gets alerted
 
