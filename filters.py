@@ -19,7 +19,7 @@ import re
 
 from retailers.base import Product
 
-MAX_PRICE = 450.0  # EUR, inclusive
+MAX_PRICE = 650.0  # EUR, inclusive
 
 # Soft BTU floor: units below this are FLAGGED as underpowered in the alert
 # text, not excluded. Only applied when a retailer exposes structured BTU
@@ -80,7 +80,10 @@ def is_mobile_ac(name: str) -> bool:
         return False
     if _EVAP_RE.search(name):
         return False  # evaporative / tent / outdoor cooler, not a real AC
-    is_ac = any(good in low for good in INCLUDE_KEYWORDS)
+    # HiFi writes "air-conditioner" (hyphen); normalise so it matches the
+    # "air conditioner" keyword. Excludes are checked on the raw name above.
+    norm = low.replace("-", " ")
+    is_ac = any(good in norm for good in INCLUDE_KEYWORDS)
     if any(d in low for d in _DEHUMID) and not is_ac:
         return False  # pure dehumidifier
     return is_ac
