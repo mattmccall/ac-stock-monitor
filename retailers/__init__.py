@@ -11,15 +11,17 @@ from .conforama import ConforamaAdapter
 from .hifi import HifiAdapter
 from .hornbach import HornbachAdapter
 from .mediamarkt import MediaMarktAdapter
+from .venteunique import VenteUniqueAdapter
 
 # Order matters only for output readability. MediaMarkt is the most reliable;
-# Conforama is low-priority/low-yield and sits last.
+# Conforama and Vente-unique are low-priority/breadth and sit last.
 ADAPTERS: list[RetailerAdapter] = [
     MediaMarktAdapter(),
     HornbachAdapter(),
     HifiAdapter(),
     BatiselfAdapter(),
     ConforamaAdapter(),
+    VenteUniqueAdapter(),
 ]
 
 __all__ = ["Product", "RetailerAdapter", "ADAPTERS"]

@@ -13,6 +13,11 @@ Runs on **GitHub Actions** every 10 minutes; also runnable locally.
 | **HiFi.lu** | Category page via **real Google Chrome** (Playwright `channel="chrome"`, headless) | Behind Akamai bot protection: plain HTTP and bundled Chromium get a cached 500; only real Chrome is served the page. Cards parsed from the DOM: name, lowest € (sale-aware) price, structured BTU (`Cooling capacity: N` → int), and **in stock = absence of "out of stock" / "currently unavailable"** (no positive string assumed). Raw status logged per product. ⚠️ **Local-only**: needs Google Chrome installed + an allowed network. Disabled in CI; runs via the local launchd agent (see below). |
 | **Conforama.lu** | Odoo grid + `?search=climatiseur` (plain HTTP) | Grid gives name/price/URL; stock read from the **product page** (absence of OOS markers). Low-priority/low-yield, fully isolated. |
 | **Batiself.lu** | WooCommerce category + product pages (plain HTTP) | Tiles give name/price/URL (dehumidifiers excluded by name). Per **product page**: OOS string `"Ce produit n'est pas disponible pour l'instant"` (presence = out), per-store stock from a `data-stocks` JSON, and delivery lead time `"Délais de livraison: N jours"` → captured + shown in the alert. **In stock only if** the OOS string is absent **and** ≥1 store has stock. (Category may be "coming soon"/empty → 0 products.) |
+| **Vente-unique.lu** | JSON-LD `ItemList` category + product pages (plain HTTP) | Marketplace. Tiles give name/`/p/` URL. **Scope filter** keeps only portable/monobloc units — drops "mural"/"split" (unless split-mobile/portasplit), the mural-unit brands (Daikin/Emura/Siesta/Baxi Sidera/Aermec/Candy Pura/Aufit), evaporative coolers and pure dehumidifiers. Per **product page** (JSON-LD `Product`): price (viewed-product price, sale-aware, ignoring recommended items), `availability` (schema.org InStock/OutOfStock), and delivery lead time where shown → `delivery_days`. Lower-priority breadth; isolated. |
+
+> The core filter treats "déshumidificateur" conditionally: a real AC that
+> merely advertises a dehumidify *function* (Comfee, CODILAM) is kept; only a
+> *pure* dehumidifier (no AC keyword) is excluded.
 
 The soft BTU floor (`BTU_SOFT_FLOOR`, default 8000) does not exclude units —
 sub-floor ACs are **flagged "underpowered"** in the alert. Only HiFi exposes

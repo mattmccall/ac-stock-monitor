@@ -15,6 +15,7 @@ from retailers.hornbach import _parse_stock, parse_tiles_html  # noqa: E402
 from retailers.hifi import parse_cards as hifi_parse_cards  # noqa: E402
 from retailers.conforama import parse_grid as conf_parse  # noqa: E402
 from retailers.batiself import parse_category as bati_parse, resolve_stock  # noqa: E402
+from retailers.venteunique import in_scope as vu_in_scope, parse_product as vu_parse  # noqa: E402
 import filters  # noqa: E402
 import notifier  # noqa: E402
 from retailers.base import Product  # noqa: E402
@@ -227,6 +228,71 @@ def test_batiself_out_when_no_store_has_stock():
     p = _resolve('data-stocks=\'{"131":{"name":"Alzingen","stock":0},'
                  '"903":{"name":"Schifflange","stock":0}}\'')
     assert p.in_stock is False     # no store in stock -> not purchase-worthy
+
+
+# --- Vente-unique: scope filter + marketplace product parse ---------------
+
+def test_vu_scope_keeps_portables():
+    for name in [
+        "Climatiseur Inverter Comfee CF 9000 BTU avec Wi-Fi, Réversible, Déshumidificateur",
+        "Climatiseur portable IceCove pour tentes d'extérieur",
+        "Olimpia Splendid Peler 4T Climatiseur portatif",
+        "Climatiseur mobile 2 en 1 fonction déshumidificateur - CODILAM",
+        "Olimpia Splendid Unico Easy S2 HP Climatiseur portatif",
+    ]:
+        assert vu_in_scope(name) is True, name
+
+
+def test_vu_scope_drops_mural_split_brands_and_evap():
+    for name in [
+        "Climatiseur Mural Baxi Sidera 9000 Btu",
+        "Daikin Bluevolution Inverter Emura Black III 18000 BTU",
+        "Daikin Siesta Pro Era 18000 Btu",
+        "Climatiseur Inverter Candy Pura 18000 Btu",
+        "Climatiseur Inverter Aermec SPG 9000 BTU",
+        "Climatiseur Inverter Aufit Freedom F4 9000 Btu",
+        "Climatiseur split à fixer au mur",
+        "Rafraîchisseur d'air évaporatif",
+        "Déshumidificateur 20L",                       # pure dehumidifier
+    ]:
+        assert vu_in_scope(name) is False, name
+
+
+def test_vu_scope_keeps_portasplit_and_split_mobile():
+    assert vu_in_scope("Olimpia Splendid PortaSplit climatiseur") is True
+    assert vu_in_scope("Climatiseur split mobile monobloc") is True
+
+
+def _vu_page(price_jsonld, availability, extra=""):
+    return (
+        '<script type="application/ld+json">'
+        '{"@type":"Product","name":"X","offers":{"@type":"Offer","price":"'
+        + price_jsonld + '","availability":"https://schema.org/' + availability
+        + '"}}</script>' + extra
+    )
+
+
+def test_vu_product_uses_main_price_not_recommended():
+    # main product (climatisation category) = 239.31; a recommended glass = 3.08
+    extra = ('"category":"Climatisation, Ventilation","variant":"Blanc","price":239.31,'
+             '"category":"Verre","variant":"Beige","price":3.08,')
+    price, in_stock, days, raw = vu_parse(_vu_page("279.99", "OutOfStock", extra))
+    assert price == 239.31          # not 3.08, not the 279.99 list price
+    assert in_stock is False        # schema OutOfStock
+
+
+def test_vu_product_in_stock_and_delivery_days():
+    extra = '<span>Expédié sous 12 jours</span>'
+    price, in_stock, days, raw = vu_parse(_vu_page("412.78", "InStock", extra))
+    assert in_stock is True
+    assert days == 12
+
+
+def test_dehumidifier_nuance_in_core_filter():
+    # AC with dehumidify *function* is kept; a pure dehumidifier is dropped.
+    assert filters.is_mobile_ac(
+        "Climatiseur Inverter Comfee CF 9000 BTU Déshumidificateur") is True
+    assert filters.is_mobile_ac("TRISTAR DH-5424 Déshumidificateur") is False
 
 
 if __name__ == "__main__":

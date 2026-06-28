@@ -51,19 +51,25 @@ EXCLUDE_KEYWORDS = [
     "boîtier",           # connection box
     "boitier",
     "télécommande seule",
-    "déshumidificateur", # dehumidifier
-    "dehumidificateur",
     "filtre",            # replacement filter
     "roulette",          # casters
     "aspirateur",        # vacuum (mis-categorised on MediaMarkt)
 ]
+
+# "déshumidificateur" is handled conditionally, not as a blanket exclude: many
+# real ACs advertise a dehumidify *function* in the name (e.g. Comfee, CODILAM
+# at Vente-unique). Only a *pure* dehumidifier (no AC keyword) is excluded.
+_DEHUMID = ("déshumidificateur", "deshumidificateur")
 
 
 def is_mobile_ac(name: str) -> bool:
     low = name.lower()
     if any(bad in low for bad in EXCLUDE_KEYWORDS):
         return False
-    return any(good in low for good in INCLUDE_KEYWORDS)
+    is_ac = any(good in low for good in INCLUDE_KEYWORDS)
+    if any(d in low for d in _DEHUMID) and not is_ac:
+        return False  # pure dehumidifier
+    return is_ac
 
 
 def is_underpowered(product: Product) -> bool:
