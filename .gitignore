@@ -8,3 +8,4 @@ __pycache__/
 *_state.json
 hifi_state.json
 .tools/
+*.log
