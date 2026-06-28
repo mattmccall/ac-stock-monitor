@@ -37,7 +37,7 @@ def format_message(product: Product) -> str:
     name = html.escape(product.name)
     retailer = html.escape(product.retailer)
     lines = [
-        "🟢 <b>En stock !</b>",
+        "🟢 <b>In stock!</b>",
         f"<b>{name}</b>",
         f"💶 {product.price_str()}  ·  🏬 {retailer}",
     ]
@@ -45,7 +45,7 @@ def format_message(product: Product) -> str:
         lines.append(f"⭐ {html.escape(product.rating)}")
     if product.specs:
         lines.append(f"📐 {html.escape(product.specs)}")
-    lines.append(f'🔗 <a href="{html.escape(product.url, quote=True)}">Voir le produit</a>')
+    lines.append(f'🔗 <a href="{html.escape(product.url, quote=True)}">View product</a>')
     return "\n".join(lines)
 
 

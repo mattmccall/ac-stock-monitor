@@ -98,18 +98,18 @@ def heartbeat() -> int:
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = [
-        "✅ <b>Moniteur AC actif</b>",
+        "✅ <b>AC monitor is alive</b>",
         f"🕛 {stamp}",
-        f"🔎 {len(products)} produit(s) lus · {len(ac)} clim(s) ≤ "
-        f"€{filters.MAX_PRICE:.0f} suivie(s)",
+        f"🔎 {len(products)} product(s) read · {len(ac)} AC(s) ≤ "
+        f"€{filters.MAX_PRICE:.0f} tracked",
     ]
     if in_now:
         names = "\n".join(f"• {p.name} ({p.price_str()})" for p in in_now)
-        lines.append(f"🟢 En stock maintenant ({len(in_now)}):\n{names}")
+        lines.append(f"🟢 In stock right now ({len(in_now)}):\n{names}")
     else:
-        lines.append("⚪ Aucune en stock pour le moment")
+        lines.append("⚪ None in stock at the moment")
     if errors:
-        lines.append("⚠️ Erreurs: " + "; ".join(errors))
+        lines.append("⚠️ Errors: " + "; ".join(errors))
 
     notifier.send_text("\n".join(lines))
     print("Heartbeat sent.")
