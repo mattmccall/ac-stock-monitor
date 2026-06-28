@@ -2,10 +2,13 @@ name: AC stock monitor
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # every 10 min: real stock check
-    # Daily heartbeat at 10:00 UTC = 12:00 (noon) Luxembourg in summer (CEST),
-    # 11:00 local in winter (CET). GitHub cron is UTC-only and ignores DST.
-    - cron: "0 10 * * *"
+    # Hourly at :23 (UTC). Off the contended top-of-hour so GitHub is less
+    # likely to delay it; high-frequency crons like */10 get throttled hard.
+    - cron: "23 * * * *"
+    # Daily heartbeat at 10:23 UTC = ~12:23 Luxembourg in summer (CEST),
+    # 11:23 in winter (CET). Same minute as the hourly cron, so at 10:23 both
+    # fire (one real check + one heartbeat), as before. Cron is UTC-only.
+    - cron: "23 10 * * *"
   workflow_dispatch:           # manual run button
     inputs:
       smoke_test:
@@ -55,7 +58,7 @@ jobs:
         run: |
           if [[ "${{ inputs.smoke_test }}" == "true" ]]; then
             python monitor.py --smoke-test
-          elif [[ "${{ github.event.schedule }}" == "0 10 * * *" ]]; then
+          elif [[ "${{ github.event.schedule }}" == "23 10 * * *" ]]; then
             python monitor.py --heartbeat
           else
             python monitor.py
