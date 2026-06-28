@@ -2,7 +2,9 @@ name: AC stock monitor
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # every 10 minutes (UTC)
+    # Daily at 10:00 UTC = 12:00 (noon) in Luxembourg during summer (CEST),
+    # 11:00 local in winter (CET). GitHub cron is UTC-only and ignores DST.
+    - cron: "0 10 * * *"
   workflow_dispatch:           # manual run button
     inputs:
       smoke_test:
