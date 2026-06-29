@@ -215,7 +215,8 @@ def main() -> int:
     # Daily heartbeat: piggyback on whatever run fires after the morning
     # window, so GitHub's irregular scheduling can't drop it entirely.
     now = datetime.now(timezone.utc)
-    if heartbeat_due(now) and notifier.is_configured():
+    if (heartbeat_due(now) and notifier.is_configured()
+            and not os.environ.get("DISABLE_HEARTBEAT")):
         try:
             notifier.send_text(heartbeat_text(products, ac_products, errors))
             _record_heartbeat(now.strftime("%Y-%m-%d"))

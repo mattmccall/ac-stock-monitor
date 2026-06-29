@@ -13,6 +13,9 @@ cd "$DIR"
 
 export DISABLE_RETAILERS="MediaMarkt.lu,Hornbach.lu,Conforama.lu"
 export STATE_PATH="$DIR/hifi_state.json"
+# The daily heartbeat is the cloud's job (full pipeline). Don't let the
+# HiFi-only local agent send its own (misleading counts / duplicate).
+export DISABLE_HEARTBEAT=1
 
 # No `exec`: keep bash as the launchd "responsible" process so the Full Disk
 # Access grant on /bin/bash also covers the Python child it spawns.
