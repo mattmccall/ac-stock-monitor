@@ -151,22 +151,28 @@ def _fetch_rendered() -> str:
     # Imported lazily so the plain-HTTP path doesn't require Playwright.
     from playwright.sync_api import sync_playwright
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        ctx = browser.new_context(
-            locale="fr-FR",
-            user_agent=HEADERS["User-Agent"],
-        )
-        page = ctx.new_page()
-        page.goto(CATEGORY_URL, wait_until="domcontentloaded", timeout=60000)
-        try:
-            page.wait_for_selector('[data-testid="article-card"]', timeout=30000)
-        except Exception:
-            pass  # parse whatever rendered; may legitimately be empty
-        page.wait_for_timeout(2000)
-        html = page.content()
-        browser.close()
-        return html
+    from ._browser import run_in_thread
+
+    def _do() -> str:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            ctx = browser.new_context(
+                locale="fr-FR",
+                user_agent=HEADERS["User-Agent"],
+            )
+            page = ctx.new_page()
+            page.goto(CATEGORY_URL, wait_until="domcontentloaded", timeout=60000)
+            try:
+                page.wait_for_selector('[data-testid="article-card"]', timeout=30000)
+            except Exception:
+                pass  # parse whatever rendered; may legitimately be empty
+            page.wait_for_timeout(2000)
+            html = page.content()
+            browser.close()
+            return html
+
+    # Fresh thread => clean Playwright event loop even if HiFi also used it.
+    return run_in_thread(_do)
 
 
 class HornbachAdapter(RetailerAdapter):

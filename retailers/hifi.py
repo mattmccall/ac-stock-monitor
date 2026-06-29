@@ -140,18 +140,25 @@ def _fetch_cards() -> list[dict]:
     """Drive real Chrome (Playwright) to get past Akamai; return card records."""
     from playwright.sync_api import sync_playwright
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(channel="chrome", headless=True)
-        try:
-            page = browser.new_context(
-                locale="en-US", user_agent=USER_AGENT,
-                viewport={"width": 1280, "height": 900},
-            ).new_page()
-            page.goto(CATEGORY_URL, wait_until="domcontentloaded", timeout=60000)
-            page.wait_for_timeout(4000)
-            return page.evaluate(_EXTRACT_JS)
-        finally:
-            browser.close()
+    from ._browser import run_in_thread
+
+    def _do() -> list[dict]:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(channel="chrome", headless=True)
+            try:
+                page = browser.new_context(
+                    locale="en-US", user_agent=USER_AGENT,
+                    viewport={"width": 1280, "height": 900},
+                ).new_page()
+                page.goto(CATEGORY_URL, wait_until="domcontentloaded", timeout=60000)
+                page.wait_for_timeout(4000)
+                return page.evaluate(_EXTRACT_JS)
+            finally:
+                browser.close()
+
+    # Run in a fresh thread so Playwright's sync API has a clean event loop
+    # even when another adapter (Hornbach) already used it this process.
+    return run_in_thread(_do)
 
 
 class HifiAdapter(RetailerAdapter):
