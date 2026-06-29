@@ -5,11 +5,9 @@ on:
     # Every 15 min at :08/:23/:38/:53 (UTC) — off the contended top-of-hour
     # (and quarter-hours), where GitHub delays scheduled runs the most. Public
     # repo => Actions minutes are free, so frequent checks cost nothing.
+    # The daily heartbeat is NOT a separate cron (GitHub drops single slots);
+    # the normal run self-sends it on the first run after ~10:23 UTC each day.
     - cron: "8,23,38,53 * * * *"
-    # Daily heartbeat at 10:23 UTC = ~12:23 Luxembourg in summer (CEST),
-    # 11:23 in winter (CET). :23 is also in the schedule above, so at 10:23
-    # both fire (one real check + one heartbeat), as before. Cron is UTC-only.
-    - cron: "23 10 * * *"
   workflow_dispatch:           # manual run button
     inputs:
       smoke_test:
@@ -59,18 +57,16 @@ jobs:
         run: |
           if [[ "${{ inputs.smoke_test }}" == "true" ]]; then
             python monitor.py --smoke-test
-          elif [[ "${{ github.event.schedule }}" == "23 10 * * *" ]]; then
-            python monitor.py --heartbeat
           else
             python monitor.py
           fi
 
       - name: Commit updated state
         run: |
-          if [[ -n "$(git status --porcelain state.json)" ]]; then
+          if [[ -n "$(git status --porcelain state.json heartbeat.json)" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add state.json
+            git add state.json heartbeat.json
             git commit -m "chore: update stock state [skip ci]"
             git push
           else

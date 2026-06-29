@@ -15,8 +15,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
+from datetime import datetime, timezone
 
 import filters
 import notifier
@@ -89,24 +91,37 @@ def smoke_test() -> int:
     return 0
 
 
-def heartbeat() -> int:
-    """Daily liveness confirmation.
+# Daily heartbeat: send on the first run at/after this UTC time each day.
+# Decoupled from any single cron slot so GitHub's flaky scheduling can't drop
+# it — whatever run fires after the window carries the heartbeat.
+HEARTBEAT_AFTER_UTC = (10, 23)  # ~12:23 Luxembourg in summer
+HEARTBEAT_PATH = os.path.join(os.path.dirname(__file__), "heartbeat.json")
 
-    Runs a real fetch + filter (so it proves Actions, the scrapers, and
-    Telegram are all working) and sends a short summary. Deliberately does NOT
-    diff or write state, so it can run alongside the regular 10-minute check
-    without racing on state.json.
-    """
-    if not notifier.is_configured():
-        print("Telegram not configured.", file=sys.stderr)
-        return 1
 
-    from datetime import datetime, timezone
+def _heartbeat_last_sent() -> str | None:
+    try:
+        with open(HEARTBEAT_PATH, encoding="utf-8") as f:
+            return json.load(f).get("last_sent")
+    except (OSError, ValueError):
+        return None
 
-    products, errors = collect()
-    ac = filters.filter_products(products)
+
+def _record_heartbeat(day: str) -> None:
+    with open(HEARTBEAT_PATH, "w", encoding="utf-8") as f:
+        json.dump({"last_sent": day}, f)
+        f.write("\n")
+
+
+def heartbeat_due(now: datetime) -> bool:
+    """True if today's heartbeat hasn't been sent and we're past the window."""
+    if _heartbeat_last_sent() == now.strftime("%Y-%m-%d"):
+        return False
+    return (now.hour, now.minute) >= HEARTBEAT_AFTER_UTC
+
+
+def heartbeat_text(products: list[Product], ac: list[Product],
+                   errors: list[str]) -> str:
     in_now = [p for p in ac if p.in_stock]
-
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = [
         "✅ <b>AC monitor is alive</b>",
@@ -121,8 +136,21 @@ def heartbeat() -> int:
         lines.append("⚪ None in stock at the moment")
     if errors:
         lines.append("⚠️ Errors: " + "; ".join(errors))
+    return "\n".join(lines)
 
-    notifier.send_text("\n".join(lines))
+
+def heartbeat() -> int:
+    """Manual liveness check: fetch, send a summary now, and exit.
+
+    Does NOT touch the daily-heartbeat date file — it's purely for on-demand
+    testing. The automatic daily heartbeat is handled inside the normal run.
+    """
+    if not notifier.is_configured():
+        print("Telegram not configured.", file=sys.stderr)
+        return 1
+    products, errors = collect()
+    ac = filters.filter_products(products)
+    notifier.send_text(heartbeat_text(products, ac, errors))
     print("Heartbeat sent.")
     return 1 if errors else 0
 
@@ -183,6 +211,18 @@ def main() -> int:
                     print(f"  telegram ERROR: {exc}", file=sys.stderr)
         else:
             print("  Telegram not configured; skipping sends.", file=sys.stderr)
+
+    # Daily heartbeat: piggyback on whatever run fires after the morning
+    # window, so GitHub's irregular scheduling can't drop it entirely.
+    now = datetime.now(timezone.utc)
+    if heartbeat_due(now) and notifier.is_configured():
+        try:
+            notifier.send_text(heartbeat_text(products, ac_products, errors))
+            _record_heartbeat(now.strftime("%Y-%m-%d"))
+            print("Daily heartbeat sent.")
+        except Exception as exc:
+            errors.append(f"heartbeat send: {exc}")
+            print(f"  heartbeat ERROR: {exc}", file=sys.stderr)
 
     # Persist state (even on first run, to establish the baseline).
     state_mod.save_state(new_state)

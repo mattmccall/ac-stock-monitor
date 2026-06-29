@@ -334,6 +334,31 @@ def test_dehumidifier_nuance_in_core_filter():
     assert filters.is_mobile_ac("TRISTAR DH-5424 Déshumidificateur") is False
 
 
+# --- daily heartbeat scheduling (decoupled from a single cron slot) -------
+
+def test_heartbeat_due_date_and_window():
+    import tempfile
+    from datetime import datetime, timezone
+    import monitor
+
+    tf = tempfile.mktemp(suffix=".json")
+    orig = monitor.HEARTBEAT_PATH
+    monitor.HEARTBEAT_PATH = tf
+    try:
+        before = datetime(2026, 6, 29, 9, 0, tzinfo=timezone.utc)   # < 10:23
+        after = datetime(2026, 6, 29, 11, 0, tzinfo=timezone.utc)   # > 10:23
+        assert monitor.heartbeat_due(before) is False               # too early
+        assert monitor.heartbeat_due(after) is True                 # due, unsent
+        monitor._record_heartbeat("2026-06-29")
+        assert monitor.heartbeat_due(after) is False                # already sent
+        nextday = datetime(2026, 6, 30, 11, 0, tzinfo=timezone.utc)
+        assert monitor.heartbeat_due(nextday) is True               # new day
+    finally:
+        monitor.HEARTBEAT_PATH = orig
+        if os.path.exists(tf):
+            os.remove(tf)
+
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in sorted(globals().items()):
